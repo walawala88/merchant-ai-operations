@@ -1,0 +1,79 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  main:
+    allow-circular-references: true
+  datasource:
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/merchant_ops?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true}
+      username: ${DB_USERNAME:root}
+      password: ${DB_PASSWORD:merchant_dev}
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:merchant_dev}
+    database: ${REDIS_DATABASE:10}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          multiplier: 2
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.merchant.ops.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    root: info
+    com.merchant.ops: ${APP_LOG_LEVEL:info}
+
+merchant:
+  jwt:
+    admin-secret-key: ${JWT_ADMIN_SECRET:dev-admin-secret-change-before-production}
+    admin-ttl: ${JWT_ADMIN_TTL_MS:7200000}
+    admin-token-name: ${JWT_ADMIN_TOKEN_NAME:token}
+    user-secret-key: ${JWT_USER_SECRET:dev-user-secret-change-before-production}
+    user-ttl: ${JWT_USER_TTL_MS:7200000}
+    user-token-name: ${JWT_USER_TOKEN_NAME:authentication}
+  alioss:
+    endpoint: ${ALIYUN_OSS_ENDPOINT:}
+    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+    bucket-name: ${ALIYUN_OSS_BUCKET:}
+  wechat:
+    app-id: ${WECHAT_APP_ID:}
+    secret: ${WECHAT_APP_SECRET:}
+    mchid: ${WECHAT_MCH_ID:}
+    mch-serial-no: ${WECHAT_MCH_SERIAL_NO:}
+    private-key-file-path: ${WECHAT_PRIVATE_KEY_FILE:}
+    api-v3-key: ${WECHAT_API_V3_KEY:}
+    we-chat-pay-cert-file-path: ${WECHAT_PAY_CERT_FILE:}
+    notify-url: ${WECHAT_NOTIFY_URL:}
+    refund-notify-url: ${WECHAT_REFUND_NOTIFY_URL:}
+  ai:
+    base-url: ${AI_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:glm-4-flash}
+    timeout-ms: ${AI_TIMEOUT_MS:30000}
+  rabbitmq:
+    enabled: ${RABBITMQ_ENABLED:false}

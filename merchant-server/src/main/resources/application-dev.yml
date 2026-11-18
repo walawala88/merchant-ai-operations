@@ -1,0 +1,4 @@
+logging:
+  level:
+    com.merchant.ops: debug
+    com.merchant.ops.mapper: debug

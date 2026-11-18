@@ -1,0 +1,23 @@
+name: Feature request
+description: 提出功能或工程改进建议
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: 当前问题或使用场景是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响范围
+      description: 是否涉及 AI 工具、缓存 Key、消息队列、接口或数据库？

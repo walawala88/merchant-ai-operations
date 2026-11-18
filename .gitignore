@@ -1,0 +1,21 @@
+**/target/
+.idea/
+*.iml
+*.class
+.env
+.env.*
+!.env.example
+uploads/
+logs/
+*.log
+*.jtl
+*.hprof
+.DS_Store
+Thumbs.db
+
+# Local-only integration tests that require external services.
+merchant-server/src/test/java/com/merchant/ops/test/HttpClientTest.java
+merchant-server/src/test/java/com/merchant/ops/test/SpringDataRedisTest.java
+
+# Local Office document kept outside the public repository.
+餐饮点餐与智能运营系统.docx

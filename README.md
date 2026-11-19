@@ -228,10 +228,10 @@ AI_MODEL=glm-4-flash
 curl -N -X POST "http://localhost:8080/admin/ai/chat/stream" \
   -H "Content-Type: application/json" \
   -H "token: <admin-jwt>" \
-  -d '{"message":"今天营业额怎么样","sessionId":"demo"}'
+  -d '{"message":"退款规则是什么","sessionId":"demo","tenantId":"tenant-demo","storeId":"store-1"}'
 ```
 
-### 5. 启用 Qdrant RAG
+当前前端 AI 请求会携带 `tenantId` 和 `storeId`，本地未配置时 `tenantId` 默认为 `default`。\n\n### 5. 启用 Qdrant RAG
 
 ```bash
 docker compose up -d qdrant
@@ -391,3 +391,4 @@ GitHub Actions 在 Push 和 Pull Request 时执行 Java 17 构建与测试。
 ## License
 
 本项目采用 [MIT License](LICENSE)。
+

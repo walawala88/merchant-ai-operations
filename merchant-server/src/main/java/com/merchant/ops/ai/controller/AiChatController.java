@@ -30,7 +30,8 @@ public class AiChatController {
     public SseEmitter chatStream(@RequestBody AiChatRequest aiChatRequest) {
         log.info("AI 流式对话请求: sessionId={}, message={}",
                 aiChatRequest.getSessionId(), aiChatRequest.getMessage());
-        return aiChatService.chatStream(aiChatRequest.getMessage(), aiChatRequest.getSessionId());
+        return aiChatService.chatStream(aiChatRequest.getMessage(), aiChatRequest.getSessionId(),
+                aiChatRequest.getTenantId(), aiChatRequest.getStoreId());
     }
 
     /*

@@ -18,4 +18,14 @@ public class AiChatRequest {
      * 例如"确认停售"需要携带上一轮生成的确认令牌。
      */
     private String sessionId;
+
+    /**
+     * 租户 ID，用于知识库隔离。
+     */
+    private String tenantId;
+
+    /**
+     * 门店 ID，用于门店级 SOP/政策过滤；平台级政策可为空。
+     */
+    private String storeId;
 }

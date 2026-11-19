@@ -7,6 +7,7 @@ import com.merchant.ops.ai.llm.LlmChatResult;
 import com.merchant.ops.ai.llm.LlmClient;
 import com.merchant.ops.ai.llm.LlmMessage;
 import com.merchant.ops.ai.llm.LlmToolCall;
+import com.merchant.ops.ai.rag.service.KnowledgeContext;
 import com.merchant.ops.ai.service.AiChatService;
 import com.merchant.ops.ai.tool.AiTool;
 import com.merchant.ops.ai.tool.ToolRegistry;
@@ -57,13 +58,13 @@ public class AiChatServiceImpl implements AiChatService {
     private final Map<String, List<LlmMessage>> sessions = new ConcurrentHashMap<>();
 
     @Override
-    public SseEmitter chatStream(String message, String sessionId) {
+    public SseEmitter chatStream(String message, String sessionId, String tenantId, String storeId) {
         if (!StringUtils.hasText(message)) {
             throw new BaseException("消息内容不能为空");
         }
         String sid = StringUtils.hasText(sessionId) ? sessionId : DEFAULT_SESSION;
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
-        aiStreamExecutor.execute(() -> streamChat(message, sid, emitter));
+        aiStreamExecutor.execute(() -> streamChat(message, sid, tenantId, storeId, emitter));
         return emitter;
     }
 
@@ -72,7 +73,8 @@ public class AiChatServiceImpl implements AiChatService {
      * 原逻辑：同步完成多轮工具调用后，一次性返回 AiChatResponse。
      */
 
-    private void streamChat(String message, String sessionId, SseEmitter emitter) {
+    private void streamChat(String message, String sessionId, String tenantId, String storeId, SseEmitter emitter) {
+        KnowledgeContext.set(StringUtils.hasText(tenantId) ? tenantId : "default", storeId);
         try {
             sendEvent(emitter, "start", Collections.singletonMap("sessionId", sessionId));
 
@@ -150,6 +152,8 @@ public class AiChatServiceImpl implements AiChatService {
         } catch (Exception ex) {
             log.error("AI SSE 流式响应失败", ex);
             sendErrorAndComplete(emitter, ex);
+        } finally {
+            KnowledgeContext.clear();
         }
     }
 

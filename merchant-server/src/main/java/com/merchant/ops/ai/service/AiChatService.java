@@ -16,7 +16,7 @@ public interface AiChatService {
      * @param sessionId 会话 ID，可为空
      * @return SSE 连接对象
      */
-    SseEmitter chatStream(String message, String sessionId);
+    SseEmitter chatStream(String message, String sessionId, String tenantId, String storeId);
 
     /*
      * 旧的非流式接口已停用：

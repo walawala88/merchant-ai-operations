@@ -1,6 +1,6 @@
 # Merchant AI Operations Platform
 
-> 商家智能运营系统：面向前台点餐与商家运营的 B/S 架构后端，在传统餐饮业务之上集成 LLM Function Calling、SSE 流式响应、工具注册中心、安全二次确认与 RabbitMQ 缓存失效。
+> 商家智能运营系统：面向前台点餐与商家运营的 B/S 架构后端，在传统餐饮业务之上集成 LLM Function Calling、SSE 流式响应、工具注册中心、安全二次确认、RabbitMQ 缓存失效，以及基于 Qdrant 的门店 SOP/平台政策 RAG。
 
 [![CI](https://github.com/walawala88/merchant-ai-operations/actions/workflows/ci.yml/badge.svg)](https://github.com/walawala88/merchant-ai-operations/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/17/)
@@ -11,9 +11,11 @@
 
 项目包含用户端点餐、商家运营管理、订单流转、经营报表和 AI 智能运营助手。核心目标不是简单调用大模型，而是让 LLM 通过受控工具访问真实业务数据，并由 Java 后端约束修改型操作，保证回答有数据依据、写操作必须经过用户确认。
 
-AI 助手采用 OpenAI 兼容的 `chat/completions` 协议，通过 Function Calling 调用 7 个业务工具，支持多轮工具编排；最终回答通过 SSE 增量推送。菜品起售、停售属于修改型操作，首次调用只返回预览与一次性确认令牌，用户确认后由后端校验令牌并执行。
+AI 助手采用 OpenAI 兼容的 `chat/completions` 协议，通过 Function Calling 调用 8 个业务工具，支持多轮工具编排；最终回答通过 SSE 增量推送。菜品起售、停售属于修改型操作，首次调用只返回预览与一次性确认令牌，用户确认后由后端校验令牌并执行。
 
-项目定位为求职展示与工程实践，不宣称达到生产环境标准。生产化仍需补充多租户隔离、审计、幂等、会话持久化、全链路可观测性与更严格的内容安全策略。
+知识问答采用 Qdrant 向量库：门店 SOP 和平台政策经过切片、Embedding 后建立索引，通过 HNSW ANN 检索、Top-K、tenant/store/docType 元数据过滤和应用层重排返回带来源的知识片段。
+
+项目定位为求职展示与工程实践，不宣称达到生产环境标准。已实现知识库的租户、门店和文档类型过滤；生产化仍需补充文档权限校验、会话持久化、全链路可观测性、内容安全和真实业务文档评测。
 
 ## 核心能力
 
@@ -31,7 +33,12 @@ AI 助手采用 OpenAI 兼容的 `chat/completions` 协议，通过 Function Cal
 ### AI 智能运营助手
 
 - OpenAI 兼容 LLM 客户端，支持智谱 GLM 等服务
-- 7 个 Function Calling 工具，统一复用现有 Service 层
+- 8 个 Function Calling 工具，统一复用现有 Service 层
+- Qdrant HNSW ANN 向量检索，支持 Top-K 和文档切片
+- `tenantId`、`storeId`、`docType`、状态和生效日期元数据过滤
+- 全局平台政策与门店 SOP 的 scope 隔离
+- 向量相似度 + 中文 bigram 词法重叠的应用层重排
+- 知识回答返回文档标题、版本、生效日期和来源
 - `ToolRegistry` 自动收集工具并生成 JSON Schema Tool Definition
 - 最多 5 轮工具调用，防止编排死循环
 - SSE 流式返回 `start`、`thinking`、`tool`、`tool_result`、`message`、`done`、`error` 事件
@@ -59,8 +66,11 @@ flowchart LR
 
     Agent --> LLM[OpenAI-compatible LLM]
     Agent --> Registry[ToolRegistry]
-    Registry --> Tools[7 Business Tools]
+    Registry --> Tools[8 Business Tools]
     Tools --> Biz
+    Tools --> RAG[Knowledge Search Tool]
+    RAG --> Qdrant[(Qdrant HNSW)]
+    Qdrant --> Embed[Embedding API]
 
     Biz --> MySQL[(MySQL)]
     Biz --> Redis[(Redis)]
@@ -78,6 +88,7 @@ flowchart LR
 | Web | Spring Boot 2.7、Spring MVC、Spring AOP |
 | 数据访问 | MyBatis、PageHelper、MySQL 8、Druid |
 | 缓存与消息 | Redis、Spring Cache、RabbitMQ |
+| RAG | Qdrant、HNSW ANN、Embedding、Top-K、元数据过滤、重排 |
 | 鉴权与实时通信 | JWT、自定义拦截器、WebSocket |
 | AI | OpenAI-compatible API、Function Calling、JSON Schema、SSE |
 | 接口文档 | Knife4j / Swagger 2 |
@@ -94,8 +105,33 @@ flowchart LR
 | `getTopSellingDishes` | 只读 | 查询销量 Top10 |
 | `getTodayTurnover` | 只读 | 查询今日营业额 |
 | `getDishInfo` | 只读 | 查询菜品及口味信息 |
+| `searchKnowledge` | 只读 | 检索门店 SOP 与平台政策，返回带来源的知识片段 |
 | `startDish` | 修改 | 菜品起售，需要一次性确认令牌 |
 | `stopDish` | 修改 | 菜品停售，需要一次性确认令牌 |
+
+## 知识库 RAG
+
+知识库只覆盖两类内容：门店 SOP 和平台规则政策。
+
+```text
+文档 API
+  -> 文档切片
+  -> Embedding
+  -> Qdrant 向量入库
+
+用户问题
+  -> tenant/store/docType/生效日期过滤
+  -> HNSW ANN Top-K
+  -> 向量分数 + 中文 bigram 词法重排
+  -> 返回标题、版本、生效日期、来源和正文片段
+```
+
+接口：
+
+- `POST /admin/knowledge/documents`：导入或更新文档
+- `POST /admin/knowledge/search`：检索知识片段
+
+示例文档位于 [`docs/rag`](docs/rag/README.md)。
 
 ## AI 对话链路
 
@@ -195,7 +231,20 @@ curl -N -X POST "http://localhost:8080/admin/ai/chat/stream" \
   -d '{"message":"今天营业额怎么样","sessionId":"demo"}'
 ```
 
-### 5. 启用 RabbitMQ 缓存失效
+### 5. 启用 Qdrant RAG
+
+```bash
+docker compose up -d qdrant
+```
+
+同时配置 OpenAI 兼容的 Embedding 接口：
+
+```bash
+AI_EMBEDDING_MODEL=embedding-3
+AI_EMBEDDING_DIMENSION=1024
+```
+
+### 6. 启用 RabbitMQ 缓存失效
 
 ```bash
 RABBITMQ_ENABLED=true
@@ -220,7 +269,16 @@ RABBITMQ_ENABLED=true
 | `JWT_USER_SECRET` | 开发占位值 | 用户端 JWT 密钥 |
 | `AI_BASE_URL` | 智谱兼容地址 | LLM 基础地址 |
 | `AI_API_KEY` | 空 | LLM API Key |
-| `AI_MODEL` | `glm-4-flash` | 模型名称 |
+| `AI_MODEL` | `glm-4-flash` | 对话模型名称 |
+| `AI_EMBEDDING_MODEL` | `embedding-3` | Embedding 模型名称 |
+| `AI_EMBEDDING_DIMENSION` | `1024` | 向量维度，必须与模型一致 |
+| `QDRANT_URL` | `http://127.0.0.1:6333` | Qdrant HTTP 地址 |
+| `QDRANT_COLLECTION` | `merchant_knowledge` | 知识库 collection |
+| `RAG_TOP_K` | `12` | ANN 初始召回数量 |
+| `RAG_FINAL_TOP_K` | `5` | 重排后返回数量 |
+| `RAG_MIN_SCORE` | `0.2` | 最低向量分数 |
+| `RAG_CHUNK_SIZE` | `500` | 文档切片最大字符数 |
+| `RAG_CHUNK_OVERLAP` | `80` | 切片重叠字符数 |
 | `ALIYUN_OSS_*` | 空 | OSS 接入参数 |
 | `WECHAT_*` | 空 | 微信登录与支付参数 |
 
@@ -239,6 +297,8 @@ RABBITMQ_ENABLED=true
 | `GET` | `/admin/report/export` | 导出运营报表 |
 | `GET` | `/admin/workspace/businessData` | 工作台经营数据 |
 | `POST` | `/admin/ai/chat/stream` | AI SSE 对话 |
+| `POST` | `/admin/knowledge/documents` | 导入或更新 SOP/政策文档 |
+| `POST` | `/admin/knowledge/search` | 检索 SOP/政策知识 |
 
 管理端请求头：
 
@@ -272,7 +332,7 @@ merchant-ai-operations
 ├── merchant-pojo                    # Entity、DTO、VO
 ├── merchant-server                  # Controller、Service、Mapper、AI、MQ、WebSocket
 │   ├── src/main/java/com/merchant/ops
-│   │   ├── ai/                      # Function Calling 与 SSE
+│   │   ├── ai/                      # Function Calling、SSE 与知识库 RAG
 │   │   ├── controller/admin         # 管理端接口
 │   │   ├── controller/user          # 用户端接口
 │   │   ├── interceptor              # JWT 拦截器
@@ -309,6 +369,12 @@ GitHub Actions 在 Push 和 Pull Request 时执行 Java 17 构建与测试。
 
 如果旧版本曾提交过真实凭据，仅从当前文件删除并不安全，应立即在对应平台轮换或作废。
 
+## RAG 验证边界
+
+- 当前完成了 Qdrant REST 客户端、ANN/Top-K/元数据过滤/重排和 Agent 工具接入，并通过 Java 编译与单元测试。
+- 当前环境没有 Qdrant 服务和 Embedding API Key，因此 RAG 端到端入库与检索尚未完成真实环境验证。
+- 生产环境应根据实际 Embedding 模型设置 AI_EMBEDDING_DIMENSION，并补充文档版本、权限和评测集。
+
 ## 后续规划
 
 - 将会话历史从进程内 Map 迁移到 Redis
@@ -316,7 +382,7 @@ GitHub Actions 在 Push 和 Pull Request 时执行 Java 17 构建与测试。
 - 将管理端密码哈希从 MD5 升级为 BCrypt/Argon2
 - 增加 Prometheus、Micrometer 和结构化日志
 - 增加 Testcontainers 集成测试
-- 增加多租户与门店维度隔离
+- 增加知识库文档版本管理、权限校验和 RAG 评测集
 
 ## 贡献
 
